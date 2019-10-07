@@ -1,0 +1,43 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
+
+android {
+    compileSdkVersion 29
+    defaultConfig {
+        applicationId "com.velmie.networkutils"
+        minSdkVersion 21
+        targetSdkVersion 29
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    implementation deps.projectModule.core
+
+    // Kotlin
+    implementation deps.kotlin.stdlib
+    implementation deps.kotlin.coroutines_core
+    implementation deps.kotlin.coroutines_android
+
+    // Android
+    implementation deps.androidx.appcompat
+    implementation deps.androidx.constraintlayout
+    implementation deps.androidx.material
+    implementation deps.androidx.livedata
+
+    // Test
+    testImplementation deps.test.junit
+    androidTestImplementation deps.test.runner
+    androidTestImplementation deps.test.espresso_core
+}
