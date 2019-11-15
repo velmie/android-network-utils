@@ -26,19 +26,17 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
         @Suppress("LeakingThis")
         val cacheSource = loadFromCache()
         result.addSource(cacheSource) { data ->
-            result.removeSource(cacheSource)
-            if (shouldFetch(data)) {
-                fetchFromNetwork()
-            } else {
-                result.addSource(cacheSource) { newData ->
-                    setValue(Resource.success(newData))
-                }
-            }
+            setValue(Resource.success(data))
+        }
+        @Suppress("LeakingThis")
+        if (shouldFetch(cacheSource.value)) {
+            fetchFromNetwork()
         }
     }
 
     @MainThread
     private fun setValue(newValue: Resource<ResultType>) {
+        // TODO compare two objects correctly
         if (result.value != newValue) {
             result.value = newValue
         }
