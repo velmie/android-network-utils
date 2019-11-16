@@ -13,7 +13,7 @@ ext.build_versions = build_versions
 def versions = [:]
 
 //Plugin
-versions.android_gradle_plugin = '3.5.0'
+versions.android_gradle_plugin = '3.5.1'
 versions.kotlin_gradle_plugin = '1.3.50'
 
 //Android
@@ -28,6 +28,12 @@ versions.lifecycle_version = "2.0.0"
 versions.kotlin_version = '1.3.50'
 versions.androidx_core_kotlin = '1.0.2'
 versions.kotlinx_coroutines = '1.3.0'
+
+//Serialisation
+versions.gson = '2.8.6'
+
+//Fuel
+versions.fuel_version = '2.2.1'
 
 //log
 versions.timber = '4.7.1'
@@ -59,6 +65,13 @@ kotlin.coroutines_core = "org.jetbrains.kotlinx:kotlinx-coroutines-core:$version
 kotlin.coroutines_android = "org.jetbrains.kotlinx:kotlinx-coroutines-android:$versions.kotlinx_coroutines"
 deps.kotlin = kotlin
 
+// Fuel
+def fuel = [:]
+fuel.core = "com.github.kittinunf.fuel:fuel:$versions.fuel_version"
+fuel.fuel_coroutines = "com.github.kittinunf.fuel:fuel-coroutines:$versions.fuel_version"
+fuel.fuel_gson = "com.github.kittinunf.fuel:fuel-gson:$versions.fuel_version"
+deps.fuel = fuel
+
 def androidx = [:]
 androidx.appcompat = "androidx.appcompat:appcompat:$versions.app_compat"
 androidx.constraintlayout = "androidx.constraintlayout:constraintlayout:$versions.constraintlayout"
@@ -86,6 +99,11 @@ deps.test = test
 def velmie = [:]
 velmie.api_parser = "com.github.velmie:jvm-api-parser:$versions.api_parser"
 deps.velmie = velmie
+
+//Serialisation
+def serialisation = [:]
+serialisation.gson = "com.google.code.gson:gson:$versions.gson"
+deps.serialisation = serialisation
 
 // Project
 def projectModule = [:]

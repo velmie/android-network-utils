@@ -9,7 +9,6 @@ import com.velmie.parser.entity.apiResponse.interfaces.ApiResponseInterface
 import com.velmie.parser.entity.parserResponse.ApiParserEmptyResponse
 import com.velmie.parser.entity.parserResponse.ApiParserErrorResponse
 import com.velmie.parser.entity.parserResponse.ApiParserSuccessResponse
-import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -24,15 +23,16 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
     init {
         result.value = Resource.loading(null)
         @Suppress("LeakingThis")
-        val cacheSource = loadFromCache()
-        result.addSource(cacheSource) { data ->
-            result.removeSource(cacheSource)
-            if (shouldFetch(data)) {
-                fetchFromNetwork()
-            } else {
-                result.addSource(cacheSource) { newData ->
-                    setValue(Resource.success(newData))
+        loadFromCache().apply {
+            result.addSource(this) { data ->
+                if (shouldFetch(data)) {
+                    fetchFromNetwork()
+                } else {
+                    setValue(Resource.success(data))
                 }
+            }
+            if (value == null) {
+                fetchFromNetwork()
             }
         }
     }
@@ -45,7 +45,7 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
     }
 
     private fun fetchFromNetwork() {
-        CoroutineScope(EmptyCoroutineContext).launch {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 val (apiResponse, error) = createCall()
                 if (error == null) {
@@ -77,7 +77,7 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                 }
             } catch (e: Exception) {
                 Timber.e(e)
-                CoroutineScope(Dispatchers.Main).launch  {
+                CoroutineScope(Dispatchers.Main).launch {
                     onFetchFailed()
                     setValue(Resource.error(e, null))
                 }
@@ -85,9 +85,9 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
         }
     }
 
-    @WorkerThread
+   // @WorkerThread
     protected fun forcePushData(data: ResultType?) {
-        CoroutineScope(Dispatchers.Main).launch  {
+        CoroutineScope(Dispatchers.Main).launch {
             setValue(Resource.success(data = data))
         }
     }
@@ -118,5 +118,6 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
     fun asLiveData(): LiveData<Resource<ResultType>> = result
 
     @WorkerThread
-    protected open fun processResponse(response: ApiParserSuccessResponse<RequestType?, Int>) = response.body
+    protected open fun processResponse(response: ApiParserSuccessResponse<RequestType?, Int>) =
+        response.body
 }
