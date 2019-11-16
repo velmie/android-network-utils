@@ -24,6 +24,17 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
     implementation deps.projectModule.core
+    implementation deps.velmie.api_parser
+
+    // Fuel
+    implementation deps.fuel.core
+    implementation deps.fuel.fuel_coroutines
+    implementation deps.fuel.fuel_gson
+
+    //Serialisation
+    implementation deps.serialisation.gson
+
+    implementation deps.logger.timber
 
     // Kotlin
     implementation deps.kotlin.stdlib
