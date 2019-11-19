@@ -25,14 +25,14 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
         @Suppress("LeakingThis")
         loadFromCache().apply {
             result.addSource(this) { data ->
+                result.removeSource(this)
                 if (shouldFetch(data)) {
                     fetchFromNetwork()
                 } else {
-                    setValue(Resource.success(data))
+                    result.addSource(this) { newData ->
+                        setValue(Resource.success(newData))
+                    }
                 }
-            }
-            if (value == null) {
-                fetchFromNetwork()
             }
         }
     }
@@ -52,9 +52,11 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                     when (val parserResponse = apiParser.parse(apiResponse)) {
                         is ApiParserSuccessResponse -> {
                             saveCallResult(processResponse(parserResponse))
+                            addCacheSource()
                         }
                         is ApiParserEmptyResponse -> {
                             saveCallResult(null)
+                            addCacheSource()
                         }
                         is ApiParserErrorResponse -> {
                             CoroutineScope(Dispatchers.Main).launch {
@@ -85,10 +87,11 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
         }
     }
 
-   // @WorkerThread
-    protected fun forcePushData(data: ResultType?) {
+    private fun addCacheSource() {
         CoroutineScope(Dispatchers.Main).launch {
-            setValue(Resource.success(data = data))
+            result.addSource(loadFromCache()) {
+                setValue(Resource.success(it))
+            }
         }
     }
 
