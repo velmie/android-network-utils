@@ -3,7 +3,6 @@ package com.velmie.networkutils.core
 import androidx.annotation.MainThread
 import androidx.annotation.WorkerThread
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.MediatorLiveData
 import com.velmie.parser.ApiParser
 import com.velmie.parser.entity.apiResponse.interfaces.ApiResponseInterface
 import com.velmie.parser.entity.parserResponse.ApiParserEmptyResponse
@@ -18,29 +17,22 @@ import timber.log.Timber
 // RequestType: Type for the API response.
 abstract class NetworkBoundResource<ResultType, RequestType>(private val apiParser: ApiParser<Int>) {
 
-    private val resultMediator = MediatorLiveData<Resource<ResultType>>()
+    private val resourceLiveData = ExclusiveHashMediator<Resource<ResultType>>()
 
     init {
-        resultMediator.value = Resource.loading(null)
+        resourceLiveData.setValue(Resource.loading(null))
         @Suppress("LeakingThis")
         loadFromCache().apply {
-            resultMediator.addSource(this) { data ->
-                resultMediator.removeSource(this)
+            resourceLiveData.addSource(this) { data ->
+                resourceLiveData.removeSource(this)
                 if (shouldFetch(data)) {
                     fetchFromNetwork()
                 } else {
-                    resultMediator.addSource(this) { newData ->
-                        setValue(Resource.success(newData))
+                    resourceLiveData.addSource(this) { newData ->
+                        resourceLiveData.setValue(Resource.success(newData))
                     }
                 }
             }
-        }
-    }
-
-    @MainThread
-    private fun setValue(newValue: Resource<ResultType>) {
-        if (resultMediator.value != newValue) {
-            resultMediator.value = newValue
         }
     }
 
@@ -59,7 +51,12 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                         is ApiParserErrorResponse -> {
                             CoroutineScope(Dispatchers.Main).launch {
                                 onFetchFailed()
-                                setValue(Resource.error(parserResponse.errors, null))
+                                resourceLiveData.setValue(
+                                    Resource.error(
+                                        parserResponse.errors,
+                                        null
+                                    )
+                                )
                             }
                         }
                     }
@@ -67,14 +64,14 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                     Timber.e(error)
                     CoroutineScope(Dispatchers.Main).launch {
                         onFetchFailed()
-                        setValue(Resource.error(error, null))
+                        resourceLiveData.setValue(Resource.error(error, null))
                     }
                 }
             } catch (e: Exception) {
                 Timber.e(e)
                 CoroutineScope(Dispatchers.Main).launch {
                     onFetchFailed()
-                    setValue(Resource.error(e, null))
+                    resourceLiveData.setValue(Resource.error(e, null))
                 }
             }
         }
@@ -83,8 +80,8 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
     @MainThread
     private fun addCacheSource(result: ResultType?) {
         CoroutineScope(Dispatchers.Main).launch {
-            resultMediator.addSource(loadFromCache()) {
-                setValue(Resource.success(it ?: result))
+            resourceLiveData.addSource(loadFromCache()) {
+                resourceLiveData.setValue(Resource.success(it ?: result))
             }
         }
     }
@@ -112,7 +109,7 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
 
     // Returns a LiveData object that represents the resource that's implemented
     // in the base class.
-    fun asLiveData(): LiveData<Resource<ResultType>> = resultMediator
+    fun asLiveData(): LiveData<Resource<ResultType>> = resourceLiveData
 
     @WorkerThread
     protected open fun processResponse(response: ApiParserSuccessResponse<RequestType?, Int>) =
