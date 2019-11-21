@@ -18,18 +18,18 @@ import timber.log.Timber
 // RequestType: Type for the API response.
 abstract class NetworkBoundResource<ResultType, RequestType>(private val apiParser: ApiParser<Int>) {
 
-    private val result = MediatorLiveData<Resource<ResultType>>()
+    private val resultMediator = MediatorLiveData<Resource<ResultType>>()
 
     init {
-        result.value = Resource.loading(null)
+        resultMediator.value = Resource.loading(null)
         @Suppress("LeakingThis")
         loadFromCache().apply {
-            result.addSource(this) { data ->
-                result.removeSource(this)
+            resultMediator.addSource(this) { data ->
+                resultMediator.removeSource(this)
                 if (shouldFetch(data)) {
                     fetchFromNetwork()
                 } else {
-                    result.addSource(this) { newData ->
+                    resultMediator.addSource(this) { newData ->
                         setValue(Resource.success(newData))
                     }
                 }
@@ -39,8 +39,8 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
 
     @MainThread
     private fun setValue(newValue: Resource<ResultType>) {
-        if (result.value != newValue) {
-            result.value = newValue
+        if (resultMediator.value != newValue) {
+            resultMediator.value = newValue
         }
     }
 
@@ -51,22 +51,15 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                 if (error == null) {
                     when (val parserResponse = apiParser.parse(apiResponse)) {
                         is ApiParserSuccessResponse -> {
-                            saveCallResult(processResponse(parserResponse))
-                            addCacheSource()
+                            addCacheSource(saveCallResult(processResponse(parserResponse)))
                         }
                         is ApiParserEmptyResponse -> {
-                            saveCallResult(null)
-                            addCacheSource()
+                            addCacheSource(saveCallResult(null))
                         }
                         is ApiParserErrorResponse -> {
                             CoroutineScope(Dispatchers.Main).launch {
                                 onFetchFailed()
-                                setValue(
-                                    Resource.error(
-                                        parserResponse.errors,
-                                        null
-                                    )
-                                )
+                                setValue(Resource.error(parserResponse.errors, null))
                             }
                         }
                     }
@@ -87,17 +80,18 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
         }
     }
 
-    private fun addCacheSource() {
+    @MainThread
+    private fun addCacheSource(result: ResultType?) {
         CoroutineScope(Dispatchers.Main).launch {
-            result.addSource(loadFromCache()) {
-                setValue(Resource.success(it))
+            resultMediator.addSource(loadFromCache()) {
+                setValue(Resource.success(it ?: result))
             }
         }
     }
 
     // Called to save the result of the API response into the database
     @WorkerThread
-    protected abstract fun saveCallResult(item: RequestType?)
+    protected abstract fun saveCallResult(item: RequestType?): ResultType?
 
     // Called with the data in the database to decide whether to fetch
     // potentially updated data from the com.neonetic.core.network.
@@ -118,7 +112,7 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
 
     // Returns a LiveData object that represents the resource that's implemented
     // in the base class.
-    fun asLiveData(): LiveData<Resource<ResultType>> = result
+    fun asLiveData(): LiveData<Resource<ResultType>> = resultMediator
 
     @WorkerThread
     protected open fun processResponse(response: ApiParserSuccessResponse<RequestType?, Int>) =
