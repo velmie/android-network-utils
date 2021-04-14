@@ -20,7 +20,7 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
     private val resourceLiveData = ExclusiveHashMediator<Resource<ResultType>>()
 
     init {
-        resourceLiveData.setValue(Resource.loading(null))
+        resourceLiveData.setValue(Loading(null))
         @Suppress("LeakingThis")
         loadFromCache().apply {
             resourceLiveData.addSource(this) { data ->
@@ -29,7 +29,7 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                     fetchFromNetwork()
                 } else {
                     resourceLiveData.addSource(this) { newData ->
-                        resourceLiveData.setValue(Resource.success(newData))
+                        resourceLiveData.setValue(Success(newData))
                     }
                 }
             }
@@ -52,9 +52,9 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                             CoroutineScope(Dispatchers.Main).launch {
                                 onFetchFailed()
                                 resourceLiveData.setValue(
-                                    Resource.error(
-                                        parserResponse.errors,
-                                        null
+                                    Error(
+                                        null,
+                                        errors = parserResponse.errors
                                     )
                                 )
                             }
@@ -64,14 +64,14 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                     Timber.e(error)
                     CoroutineScope(Dispatchers.Main).launch {
                         onFetchFailed()
-                        resourceLiveData.setValue(Resource.error(error, null))
+                        resourceLiveData.setValue(Error(null, exception = error))
                     }
                 }
             } catch (e: Exception) {
                 Timber.e(e)
                 CoroutineScope(Dispatchers.Main).launch {
                     onFetchFailed()
-                    resourceLiveData.setValue(Resource.error(e, null))
+                    resourceLiveData.setValue(Error(null, exception = e))
                 }
             }
         }
@@ -81,7 +81,7 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
     private fun addCacheSource(result: ResultType?) {
         CoroutineScope(Dispatchers.Main).launch {
             resourceLiveData.addSource(loadFromCache()) {
-                resourceLiveData.setValue(Resource.success(it ?: result))
+                resourceLiveData.setValue(Success(it ?: result))
             }
         }
     }
