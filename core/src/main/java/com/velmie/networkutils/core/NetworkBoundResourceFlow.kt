@@ -2,7 +2,6 @@ package com.velmie.networkutils.core
 
 import androidx.annotation.MainThread
 import androidx.annotation.WorkerThread
-import androidx.lifecycle.LiveData
 import com.velmie.parser.ApiParser
 import com.velmie.parser.entity.apiResponse.interfaces.ApiResponseInterface
 import com.velmie.parser.entity.parserResponse.ApiParserEmptyResponse
@@ -10,27 +9,32 @@ import com.velmie.parser.entity.parserResponse.ApiParserErrorResponse
 import com.velmie.parser.entity.parserResponse.ApiParserSuccessResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.count
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
 // ResultType: Type for the Resource data.
 // RequestType: Type for the API response.
-abstract class NetworkBoundResource<ResultType, RequestType>(private val apiParser: ApiParser<Int>) {
+abstract class NetworkBoundResourceFlow<ResultType, RequestType>(private val apiParser: ApiParser<Int>) {
 
-    private val resourceLiveData = ExclusiveHashMediator<Resource<ResultType>>()
+    private val resourceDataData = MutableStateFlow<Resource<ResultType>>(Loading(null))
 
     init {
-        resourceLiveData.setValue(Loading(null))
         @Suppress("LeakingThis")
-        loadFromCache().apply {
-            resourceLiveData.addSource(this) { data ->
-                resourceLiveData.removeSource(this)
-                if (shouldFetch(data)) {
-                    fetchFromNetwork()
-                } else {
-                    resourceLiveData.addSource(this) { newData ->
-                        resourceLiveData.setValue(Success(newData))
+        CoroutineScope(Dispatchers.IO).launch {
+            if (loadFromCache().count() == 0) {
+                fetchFromNetwork()
+            } else {
+                loadFromCache().collect { data ->
+                    if (shouldFetch(data)) {
+                        fetchFromNetwork()
+                    } else {
+                        pushValue(Success(data))
                     }
+                    cancel()
                 }
             }
         }
@@ -43,15 +47,15 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                 if (error == null) {
                     when (val parserResponse = apiParser.parse(apiResponse)) {
                         is ApiParserSuccessResponse -> {
-                            addCacheSource(saveCallResult(processResponse(parserResponse)))
+                            pushValue(Success(saveCallResult(processResponse(parserResponse))))
                         }
                         is ApiParserEmptyResponse -> {
-                            addCacheSource(saveCallResult(null))
+                            pushValue(Success(saveCallResult(null)))
                         }
                         is ApiParserErrorResponse -> {
                             CoroutineScope(Dispatchers.Main).launch {
                                 onFetchFailed()
-                                resourceLiveData.setValue(
+                                pushValue(
                                     Error(
                                         null,
                                         errors = parserResponse.errors
@@ -64,26 +68,21 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                     Timber.e(error)
                     CoroutineScope(Dispatchers.Main).launch {
                         onFetchFailed()
-                        resourceLiveData.setValue(Error(null, exception = error))
+                        pushValue(Error(null, exception = error))
                     }
                 }
             } catch (e: Exception) {
                 Timber.e(e)
                 CoroutineScope(Dispatchers.Main).launch {
                     onFetchFailed()
-                    resourceLiveData.setValue(Error(null, exception = e))
+                    pushValue(Error(null, exception = e))
                 }
             }
         }
     }
 
-    @MainThread
-    private fun addCacheSource(result: ResultType?) {
-        CoroutineScope(Dispatchers.Main).launch {
-            resourceLiveData.addSource(loadFromCache()) {
-                resourceLiveData.setValue(Success(it ?: result))
-            }
-        }
+    private suspend fun pushValue(resource: Resource<ResultType>) {
+        resourceDataData.emit(resource)
     }
 
     // Called to save the result of the API response into the database
@@ -97,11 +96,11 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
 
     // Called to getMachine the cached data from the database.
     @MainThread
-    protected abstract fun loadFromCache(): LiveData<ResultType>
+    protected abstract fun loadFromCache(): Flow<ResultType?>
 
     // Called to create the API call.
-    @MainThread
-    protected abstract fun createCall(): Pair<ApiResponseInterface<RequestType?>?, Exception?>
+    @WorkerThread
+    protected abstract suspend fun createCall(): Pair<ApiResponseInterface<RequestType?>?, Exception?>
 
     // Called when the fetch fails. The child class may want to reset components
     // like rate limiter.
@@ -109,7 +108,7 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
 
     // Returns a LiveData object that represents the resource that's implemented
     // in the base class.
-    fun asLiveData(): LiveData<Resource<ResultType>> = resourceLiveData
+    fun asFlow(): Flow<Resource<ResultType>> = resourceDataData
 
     @WorkerThread
     protected open fun processResponse(response: ApiParserSuccessResponse<RequestType?, Int>) =

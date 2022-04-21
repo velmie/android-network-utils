@@ -24,12 +24,12 @@ class MainActivity : AppCompatActivity() {
 
         val list1 = listOf(client1, client2)
 
-        activationInfo(list1).observe(this, Observer {
+       /* activationInfo(list1).observe(this, Observer {
             Timber.d(it.toString())
-        })
+        })*/
     }
 
-    fun activationInfo(list: List<Client>): LiveData<Resource<List<Client>>> {
+    /*fun activationInfo(list: List<Client>): LiveData<Resource<List<Client>>> {
         return object :
             NetworkBoundResource<List<Client>, List<Client>>(ApiParser(mapOf(), 1)) {
 
@@ -60,5 +60,5 @@ class MainActivity : AppCompatActivity() {
             override fun onFetchFailed() {
             }
         }.asLiveData()
-    }
+    }*/
 }
