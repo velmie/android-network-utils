@@ -1,3 +1,7 @@
+plugins {
+    id 'maven-publish'
+}
+
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
@@ -54,3 +58,34 @@ dependencies {
     androidTestImplementation deps.test.runner
     androidTestImplementation deps.test.espresso_core
 }
+
+afterEvaluate {
+    publishing {
+        repositories {
+            maven {
+                name = "android-network-utils"
+                url = uri("https://maven.pkg.github.com/velmie/android-network-utils")
+                credentials {
+                    Properties properties = new Properties()
+                    def propertiesFile = project.rootProject.file('local.properties')
+                    if (propertiesFile.exists()) {
+                        properties.load(propertiesFile.newDataInputStream())
+                    }
+                    username = properties.getProperty('GITHUB_USER') ?: System.env.GITHUB_USER
+                    password = properties.getProperty('GITHUB_PACKAGE_TOKEN') ?: System.env.GITHUB_TOKEN
+                }
+            }
+        }
+
+        publications {
+            release(MavenPublication) {
+                from components.release
+
+                groupId "com.velmie.actexecutor"
+                artifactId 'com.velmie.networkutils'
+                version "0.3.0-rc1"
+            }
+        }
+    }
+}
+
