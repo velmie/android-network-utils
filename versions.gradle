@@ -42,7 +42,7 @@ versions.timber = '4.7.1'
 versions.ktlint_version = '0.34.2'
 
 // Velmie
-versions.api_parser = 'develop-SNAPSHOT'
+versions.api_parser = '0.0.4'
 
 //test
 versions.junit = '4.12'
@@ -97,7 +97,7 @@ deps.test = test
 
 // Velmie
 def velmie = [:]
-velmie.api_parser = "com.github.velmie:jvm-api-parser:$versions.api_parser"
+velmie.api_parser = "com.velmie.jvm-api-parser:api-parser:$versions.api_parser"
 deps.velmie = velmie
 
 //Serialisation
@@ -113,10 +113,26 @@ deps.projectModule = projectModule
 
 ext.deps = deps
 
-static def addRepos(RepositoryHandler handler) {
+def addRepos(RepositoryHandler handler) {
+
+    Properties properties = new Properties()
+    def propertiesFile = project.rootProject.file('local.properties')
+    if (propertiesFile.exists()) {
+        properties.load(propertiesFile.newDataInputStream())
+    }
+    def github_username = properties.getProperty('GITHUB_USER') ?: System.env.GITHUB_USER
+    def github_password = properties.getProperty('GITHUB_PACKAGE_TOKEN') ?: System.env.GITHUB_PACKAGE_TOKEN
+
     handler.google()
     handler.jcenter()
     handler.maven { url 'https://jitpack.io' }
+    handler.maven {
+        url "https://maven.pkg.github.com/velmie/jvm-api-parser"
+        credentials {
+            username = github_username
+            password = github_password
+        }
+    }
 }
 
 ext.addRepos = this.&addRepos
