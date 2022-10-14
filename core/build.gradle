@@ -81,8 +81,8 @@ afterEvaluate {
             release(MavenPublication) {
                 from components.release
 
-                groupId "com.velmie.actexecutor"
-                artifactId 'com.velmie.networkutils'
+                groupId "com.github.velmie"
+                artifactId 'android-network-utils'
                 version "0.3.1-rc1"
             }
         }

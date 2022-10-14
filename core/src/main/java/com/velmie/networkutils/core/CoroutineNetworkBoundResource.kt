@@ -9,6 +9,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
+import java.io.IOException
 
 // ResultType: Type for the Resource data.
 // RequestType: Type for the API response.
@@ -49,18 +50,18 @@ abstract class CoroutineNetworkBoundResource<ResultType, RequestType>(private va
                         resourceFlow.value = Success(saveCallResult(null))
                     }
                     is ApiParserErrorResponse -> {
-                        onFetchFailed()
+                        onFetchFailed(HttpProcessingException(parserResponse.errors.toString()))
                         resourceFlow.value = Error(null, errors = parserResponse.errors)
                     }
                 }
             } else {
                 Timber.e(error)
-                onFetchFailed()
+                onFetchFailed(error)
                 resourceFlow.value = Error(null, exception = error)
             }
         } catch (e: Exception) {
             Timber.e(e)
-            onFetchFailed()
+            onFetchFailed(e)
             resourceFlow.value = Error(null, exception = e)
         }
     }
@@ -80,7 +81,7 @@ abstract class CoroutineNetworkBoundResource<ResultType, RequestType>(private va
 
     // Called when the fetch fails. The child class may want to reset components
     // like rate limiter.
-    protected open fun onFetchFailed() {}
+    protected open fun onFetchFailed(exception: Exception) {}
 
     protected open fun processResponse(response: ApiParserSuccessResponse<RequestType?, Int>) =
         response.body
