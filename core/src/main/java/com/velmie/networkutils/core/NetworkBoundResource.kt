@@ -50,7 +50,7 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                         }
                         is ApiParserErrorResponse -> {
                             CoroutineScope(Dispatchers.Main).launch {
-                                onFetchFailed()
+                                onFetchFailed(HttpProcessingException(parserResponse.errors.toString()))
                                 resourceLiveData.setValue(
                                     Error(
                                         null,
@@ -63,14 +63,14 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
                 } else {
                     Timber.e(error)
                     CoroutineScope(Dispatchers.Main).launch {
-                        onFetchFailed()
+                        onFetchFailed(error)
                         resourceLiveData.setValue(Error(null, exception = error))
                     }
                 }
             } catch (e: Exception) {
                 Timber.e(e)
                 CoroutineScope(Dispatchers.Main).launch {
-                    onFetchFailed()
+                    onFetchFailed(e)
                     resourceLiveData.setValue(Error(null, exception = e))
                 }
             }
@@ -105,7 +105,7 @@ abstract class NetworkBoundResource<ResultType, RequestType>(private val apiPars
 
     // Called when the fetch fails. The child class may want to reset components
     // like rate limiter.
-    protected open fun onFetchFailed() {}
+    protected open fun onFetchFailed(exception: Exception) {}
 
     // Returns a LiveData object that represents the resource that's implemented
     // in the base class.
