@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.count
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.io.IOException
+import java.net.HttpRetryException
 
 // ResultType: Type for the Resource data.
 // RequestType: Type for the API response.
@@ -54,7 +56,7 @@ abstract class NetworkBoundResourceFlow<ResultType, RequestType>(private val api
                         }
                         is ApiParserErrorResponse -> {
                             CoroutineScope(Dispatchers.Main).launch {
-                                onFetchFailed()
+                                onFetchFailed(HttpProcessingException(parserResponse.errors.toString()))
                                 pushValue(
                                     Error(
                                         null,
@@ -67,14 +69,14 @@ abstract class NetworkBoundResourceFlow<ResultType, RequestType>(private val api
                 } else {
                     Timber.e(error)
                     CoroutineScope(Dispatchers.Main).launch {
-                        onFetchFailed()
+                        onFetchFailed(error)
                         pushValue(Error(null, exception = error))
                     }
                 }
             } catch (e: Exception) {
                 Timber.e(e)
                 CoroutineScope(Dispatchers.Main).launch {
-                    onFetchFailed()
+                    onFetchFailed(e)
                     pushValue(Error(null, exception = e))
                 }
             }
@@ -104,7 +106,7 @@ abstract class NetworkBoundResourceFlow<ResultType, RequestType>(private val api
 
     // Called when the fetch fails. The child class may want to reset components
     // like rate limiter.
-    protected open fun onFetchFailed() {}
+    protected open fun onFetchFailed(exception: Exception) {}
 
     // Returns a LiveData object that represents the resource that's implemented
     // in the base class.
